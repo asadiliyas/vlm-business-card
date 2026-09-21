@@ -58,8 +58,8 @@ error, or repeated unparseable output.
                     │  1. try PRIMARY          │──── vLLM + Qwen2.5-VL-7B-AWQ
                     │     (retry + backoff)     │     on EC2 g4dn.xlarge spot
                     │  2. on failure, try       │
-                    │     FALLBACK              │──── Hosted Qwen (DashScope /
-                    └─────────────────────────┘     OpenRouter)
+                    │     FALLBACK              │──── Hosted Qwen (OpenRouter,
+                    └─────────────────────────┘     free tier — see below)
 ```
 
 **Why this matters more than it might look:** a spot GPU instance can be
@@ -78,6 +78,38 @@ switching backends is a config change (base URL, model name, API key), not
 a rewrite. This is also what makes the CPU contingency path (below) nearly
 free to support.
 
+**Honest current status of the fallback layer, as deployed:** the
+*primary* backend (self-hosted Qwen2.5-VL) is fully verified — 100%
+field accuracy on the test set, confirmed through the live public URL.
+The *fallback* is configured and will be used automatically the moment
+primary is unavailable, but its actual reliability right now is
+best-effort rather than verified, for two concrete, external reasons hit
+during deployment rather than anything wrong with the design:
+
+- **DashScope** (the originally intended fallback — first-party Qwen
+  hosting) does not currently offer account registration for this
+  deployment's country. Not a workaround-able bug; confirmed directly by
+  Alibaba Cloud's own support chat.
+- **OpenRouter's free tier**, for a brand-new account with no payment
+  history, throttles image-bearing (vision) requests specifically —
+  confirmed by testing multiple different free vision models across
+  different underlying providers, including explicit provider-routing to
+  bypass the shared pool. Plain text completions on the same account work
+  fine; it's specifically the more expensive vision calls that get
+  deprioritized for unfunded accounts. This is OpenRouter's own anti-abuse
+  design, not a configuration error here.
+
+**What this means in practice:** if the primary is ever down at the same
+moment the fallback's free-tier pool is congested, a card fails cleanly
+with a readable error rather than the app crashing — the same graceful
+degradation this architecture was already designed to guarantee (see
+`backend/tests/test_vlm_client.py`, which covers this exact case with a
+scripted fake backend). The fallback isn't broken; it's rate-limited by
+its provider under the specific constraint of staying at zero cost. It
+will start working reliably on its own once that account has any payment
+history, without a single code change — or the moment a non-India
+DashScope path becomes available.
+
 ## 3. GPU primary, CPU contingency, hosted fallback — three deployment paths, one adapter
 
 A brand-new AWS account's GPU vCPU quota defaults to **0**. A
@@ -89,7 +121,7 @@ block the whole project on that approval:
 |---|---|---|---|
 | **Primary** | Qwen2.5-VL-7B-Instruct-AWQ on vLLM, `g4dn.xlarge` spot | Yes | 2–5s |
 | **Contingency** (currently live) | Qwen2.5-VL-3B-Instruct (Q4_K_M GGUF, `ggml-org` build) on llama.cpp, `m7i-flex.large` — free-tier eligible on this account | No | 30–90s |
-| **Fallback** | Hosted Qwen (DashScope `qwen-vl-max` or OpenRouter) | No | 3–8s |
+| **Fallback** | Hosted Qwen via OpenRouter (`qwen/qwen3.8-27b:free`) | No | 3–8s when its free pool has capacity — see status note above |
 
 All three are wired up and swappable purely through environment variables
 (`VLM_PRIMARY_BASE_URL`, `VLM_PRIMARY_MODEL`, …). Development happened

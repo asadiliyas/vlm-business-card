@@ -18,12 +18,20 @@ systemctl enable --now docker
 
 docker rm -f qwen-vlm-cpu 2>/dev/null || true
 
+# The ghcr.io/ggml-org/llama.cpp:server image bakes in its own HEALTHCHECK
+# against the default port 8080 — since we run on 8000 (LLAMA_ARG_PORT
+# below, to match VLM_PRIMARY_BASE_URL), that default check always fails
+# and `docker ps` misreports the container as unhealthy even when it's
+# serving real requests correctly. Overriding it here to check the actual
+# port fixes that (found during deployment testing — see git history).
 docker run -d \
     --name qwen-vlm-cpu \
     --restart unless-stopped \
     --shm-size 4g \
     -p 8000:8000 \
     -v /opt/llama-models:/models \
+    --health-cmd "curl -f http://localhost:8000/health || exit 1" \
+    --health-interval 30s --health-timeout 5s --health-retries 3 --health-start-period 15s \
     -e LLAMA_ARG_HF_REPO="ggml-org/Qwen2.5-VL-3B-Instruct-GGUF" \
     -e LLAMA_ARG_HF_FILE="Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf" \
     -e LLAMA_ARG_MMPROJ_URL="https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf" \

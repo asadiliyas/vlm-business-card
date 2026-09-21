@@ -110,7 +110,10 @@ Fill in:
   (private IP, not public — the security group only allows the app tier to
   reach it, and using the private IP avoids the $0.005/hr public-IPv4 charge
   on that instance's traffic to the app)
-- `VLM_FALLBACK_API_KEY` → a real DashScope or OpenRouter API key
+- `VLM_FALLBACK_API_KEY` → a real OpenRouter API key (or DashScope, if
+  available in your country — it wasn't for this deployment; see
+  `docs/ARCHITECTURE.md` §2 for the fallback's current reliability status
+  either way)
 
 Then:
 ```bash

@@ -36,7 +36,17 @@ class Settings(BaseSettings):
     vlm_fallback_enabled: bool = True
 
     # --- VLM call behavior ---
-    vlm_timeout_seconds: float = 60.0
+    # 240s (not the more obvious 30-60s) because concurrent CPU-backed
+    # inference genuinely needs this headroom: under PROCESSING_CONCURRENCY
+    # requests contending for the same box, each individual call takes far
+    # longer than its solo latency. Measured directly during deployment
+    # testing: a single card under 2-way concurrency on a 2-vCPU box took
+    # 144s end to end (~2.85 tokens/sec generation) — a first attempt at
+    # 60s, then 120s, both still timed every card out before either the
+    # primary retry or the fallback's own rate limit had a chance to
+    # succeed. A fast GPU backend finishes in seconds regardless, so
+    # raising this costs nothing there.
+    vlm_timeout_seconds: float = 240.0
     vlm_max_retries: int = 2
     vlm_temperature: float = 0.0
     vlm_confidence_retry_threshold: float = 0.55
@@ -45,7 +55,13 @@ class Settings(BaseSettings):
     max_files_per_job: int = 40
     max_file_mb: float = 10.0
     allowed_mime_types: tuple[str, ...] = ("image/jpeg", "image/png", "image/webp", "image/heic")
-    processing_concurrency: int = 4
+    # 2 (not 4) because this is safe on both deployment paths: a 2-vCPU CPU
+    # inference box (the free-tier contingency, see docs/ARCHITECTURE.md
+    # §1) genuinely can't usefully serve 4 concurrent vision calls — real
+    # testing showed all 4 timing out under that load. A GPU backend has
+    # headroom to raise this (4+) once confirmed healthy; 2 is the
+    # conservative default that works out of the box either way.
+    processing_concurrency: int = 2
     image_long_edge_px: int = 1280
     thumbnail_px: int = 256
 
