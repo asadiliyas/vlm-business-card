@@ -1,0 +1,17 @@
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+frontend/dist
+backend/data
+backend/.env
+.env
+.git
+.github
+sample_cards
+eval_data
+*.md
+!README.md
+.claude

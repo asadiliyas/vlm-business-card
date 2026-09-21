@@ -1,0 +1,33 @@
+# Caddy automatically requests and renews a Let's Encrypt TLS certificate
+# for whatever domain is set here — no manual cert management needed.
+#
+# APP_DOMAIN is read from the environment (set it in the shell that runs
+# `docker compose up`, e.g. in a .env file at the repo root next to this
+# one, or exported before the compose command). For the zero-cost path
+# described in docs/DEPLOY.md, this is a sslip.io hostname that resolves to
+# the app instance's own Elastic IP, e.g.:
+#   APP_DOMAIN=vlm-cards.203-0-113-10.sslip.io
+{$APP_DOMAIN} {
+    reverse_proxy app:8000
+
+    encode zstd gzip
+
+    header {
+        # Baseline hardening; the app itself has no cookies/sessions to protect,
+        # but these cost nothing and are good hygiene for a public endpoint.
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Uploaded batches can be several images at once — keep this comfortably
+    # above MAX_FILES_PER_JOB * MAX_FILE_MB from backend/.env.
+    request_body {
+        max_size 200MB
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

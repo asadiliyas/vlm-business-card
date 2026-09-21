@@ -1,0 +1,35 @@
+{
+  "card_01_clean.jpg": {
+    "first_name": "Amara",
+    "last_name": "Okafor",
+    "job_title": "Chief Medical Officer",
+    "company": "Lakeside General Hospital",
+    "location": "Nairobi, Kenya",
+    "phone": "+254712345678",
+    "email": "amara.okafor@lakesidegh.org"
+  },
+  "card_02_clean.jpg": {
+    "first_name": "Marcus",
+    "last_name": "Chen",
+    "job_title": "VP of Engineering",
+    "company": "Brightline Robotics Inc.",
+    "location": "Austin, TX, USA",
+    "phone": "+15125550182",
+    "email": "marcus.chen@brightline.io"
+  },
+  "card_03_clean.jpg": {
+    "first_name": "Priya",
+    "last_name": "Sharma",
+    "job_title": "Head of Partnerships",
+    "company": "Northwind Logistics Ltd",
+    "location": "Singapore",
+    "phone": "+6581234567",
+    "email": "priya.sharma@northwindlog.com"
+  },
+  "card_04_company_only.jpg": {
+    "company": "Summit & Vale Consulting",
+    "location": "London, United Kingdom",
+    "phone": "+442079460958",
+    "email": "info@summitvale.co.uk"
+  }
+}
