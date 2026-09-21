@@ -180,6 +180,93 @@ cd frontend && npm run build   # TypeScript strict-mode check + production bundl
 CI (`.github/workflows/ci.yml`) runs both, plus a Docker build, on every
 push.
 
+## Known limitations / what I'd improve with more time
+
+- **The fallback VLM backend is best-effort, not verified-reliable.** The
+  primary (self-hosted Qwen2.5-VL, currently on the CPU contingency path
+  — see below) is fully verified at 100% field accuracy on the test set.
+  The hosted fallback is configured and will engage automatically the
+  moment the primary is unavailable, but two external constraints hit
+  during deployment mean it isn't dependable today: DashScope doesn't
+  currently accept registrations from this account's country, and
+  OpenRouter throttles vision (not text) requests hard for accounts with
+  no payment history. Full detail and reasoning in
+  [docs/ARCHITECTURE.md §2](docs/ARCHITECTURE.md#2-primaryfallback-vlm-backend-chain).
+  With more time: either a payment-history-bearing OpenRouter account, or
+  a DashScope account registered from a supported country, would make
+  this fully reliable with no code changes — the adapter already supports
+  either.
+- **Running on the CPU contingency path, not the GPU path, at submission
+  time.** A brand-new AWS account's GPU vCPU quota defaults to 0; the
+  increase was requested on day one but AWS's approval can take longer
+  than this project's timeline. The CPU path (Qwen2.5-VL-3B on a
+  free-tier-eligible instance) is fully functional — verified at 100%
+  accuracy — just slower per card (tens of seconds vs. single digits on
+  GPU). The architecture is designed so this is a config change, not a
+  rewrite, once the quota clears.
+- **No authentication.** Reasonable for a single-reviewer take-home
+  submission; a real internal tool would add it.
+- **Single SQLite instance, no horizontal scaling.** Appropriate at this
+  scale (see [docs/ARCHITECTURE.md §5](docs/ARCHITECTURE.md#5-why-fastapi--sqlite-instead-of-a-heavier-stack)
+  for the reasoning); Postgres + a real job queue would be the next step
+  if usage ever demanded it.
+- **The accuracy number (100%) is on a small, synthetic sample set** (4
+  cards, clean and flat, no glare/rotation/handwriting) — a pipeline
+  correctness check, not a claim about real-world photographed cards. The
+  eval harness (`backend/scripts/eval.py`) is built to run against a
+  larger, real-card set; I'd build that set with more time.
+- **Mobile layout was implemented deliberately** (a responsive card view
+  replaces the results table below tablet width) but I don't have a way
+  to screenshot it myself to confirm the visual result — worth a spot
+  check on an actual device.
+
+## AI Usage
+
+This project was built with **Claude Code** (Anthropic's agentic CLI,
+running Claude Opus 5 / Sonnet 5) as the primary development tool, used
+end to end: architecture and prompt design, the full FastAPI backend and
+React frontend, the AWS infrastructure (provisioned via CLI — EC2,
+security groups, Elastic IP, Service Quotas, Budgets/CloudWatch alarms),
+live deployment and debugging against the real running system, and the
+UI redesign pass.
+
+**What I did, and what the AI did:** I set direction and made the calls
+that were mine to make — the primary/fallback deployment strategy and
+its cost trade-offs, which hosted-Qwen provider to sign up for, when to
+proceed past a cost checkpoint, rejecting and redirecting the first UI
+color scheme, and verifying the live app myself in the browser at each
+stage. Claude Code wrote the implementation, ran the AWS CLI commands
+against my credentials, SSH'd into the instances to configure and debug
+them, and iterated based on what real testing against the live deployment
+actually showed — including diagnosing and fixing real bugs found only by
+testing against production (a job-orphaning race condition on container
+restart, a concurrency/timeout mismatch that broke bulk uploads under
+real load, a mislabeled Hugging Face model repo, and a Docker healthcheck
+pointed at the wrong port). I reviewed the results at each step rather
+than accepting them sight unseen — through the running application, the
+extracted data, and the exported files.
+
+**Adopted:** the primary/fallback VLM adapter design (one client, backend
+swappable by config, so a stopped GPU instance or an AWS quota delay never
+takes the app down); the defensive JSON-parsing layer for VLM output
+(models reliably wrap JSON in markdown fences or add stray text despite
+instructions not to); the retention/PII-minimization approach for
+uploaded card images; the concurrency and timeout values, which were
+tuned to real numbers measured against the live inference server rather
+than left at initial guesses.
+
+**Rejected or changed:** the first version of the frontend used a
+default indigo/violet color scheme, which read as a generic
+AI-scaffolded template rather than a considered design — I rejected it
+and asked for a different, more deliberate palette. Claude's first
+attempt at a hosted-Qwen fallback (via DashScope) turned out to be
+blocked by account-country availability, and a follow-up attempt
+(OpenRouter's free tier) turned out to be unreliable for vision requests
+on a zero-payment-history account; rather than accept either as "done,"
+I asked for direct verification (which surfaced both issues honestly)
+and for the limitation to be documented plainly instead of overstated —
+see "Known limitations" above.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
