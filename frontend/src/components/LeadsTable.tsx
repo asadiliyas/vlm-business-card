@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import type { EditableLeadField, Lead } from "../types";
 import { ConfidenceBadge, StatusChip, WarningBadges } from "./Badges";
 import { EditableCell } from "./EditableCell";
+import { LeadCard } from "./LeadCard";
 
 interface Props {
   leads: Lead[];
@@ -119,38 +120,49 @@ export function LeadsTable({ leads, onEditField, onDeleteLead }: Props) {
 
   if (leads.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-ink-300 bg-white py-16 text-center text-sm text-ink-500">
+      <div className="rounded-lg border border-dashed border-ink-300 bg-white py-16 text-center text-sm text-ink-500">
         No leads yet — upload a batch of business cards above to get started.
       </div>
     );
   }
 
   return (
-    <div className="thin-scrollbar overflow-x-auto rounded-xl border border-ink-200 bg-white shadow-sm">
-      <table className="w-full min-w-[1100px] border-collapse text-sm">
-        <thead>
-          {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-ink-200 bg-ink-50">
-              {hg.headers.map((header) => (
-                <th key={header.id} className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-3 py-2 align-top">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {/* Below md: a stack of cards. An 11-column table has no good answer
+          on a phone screen other than "scroll sideways forever", so this
+          reshapes the same data instead of just shrinking the table. */}
+      <div className="space-y-3 md:hidden">
+        {leads.map((lead) => (
+          <LeadCard key={lead.id} lead={lead} onEditField={onEditField} onDeleteLead={onDeleteLead} />
+        ))}
+      </div>
+
+      <div className="thin-scrollbar hidden overflow-x-auto rounded-lg border border-ink-200 bg-white shadow-sm md:block">
+        <table className="w-full min-w-[1100px] border-collapse text-sm">
+          <thead>
+            {table.getHeaderGroups().map((hg) => (
+              <tr key={hg.id} className="border-b border-ink-200 bg-ink-50">
+                {hg.headers.map((header) => (
+                  <th key={header.id} className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr key={row.id} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-3 py-2 align-top">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@ import { deleteJob, deleteLead, exportJobUrl, getHealth, updateLead, uploadJob }
 import { Dropzone } from "./components/Dropzone";
 import { LeadsTable } from "./components/LeadsTable";
 import { ProgressSummary } from "./components/ProgressSummary";
+import { Stepper } from "./components/Stepper";
 import { useJobPolling } from "./hooks/useJobPolling";
 import type { EditableLeadField, HealthResponse } from "./types";
 
@@ -58,60 +59,91 @@ export default function App() {
   }, [jobId, setJob]);
 
   const doneLeadCount = job?.leads.filter((l) => l.status === "done").length ?? 0;
+  const jobInProgress = job?.status === "queued" || job?.status === "processing";
+  const currentStep: 1 | 2 | 3 = !job ? 1 : jobInProgress ? 2 : 3;
 
   return (
     <div className="min-h-screen bg-ink-50">
       <header className="border-b border-ink-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold text-ink-900">Business Card Lead Extractor</h1>
-            <p className="text-sm text-ink-500">Bulk-upload business cards and export a structured lead list.</p>
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink-900">
+              <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                <rect x="2.5" y="5" width="19" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                <circle cx="8.5" cy="12" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M13.5 10h5M13.5 14h3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-base font-semibold leading-tight text-ink-900">Business Card Lead Extractor</h1>
+              <p className="text-xs text-ink-500">Bulk-upload business cards, export a structured lead list.</p>
+            </div>
           </div>
           {health && (
-            <div className="flex items-center gap-2 text-xs text-ink-500">
+            <div className="inline-flex w-fit items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-xs text-ink-600">
               <span
-                className={`h-2 w-2 rounded-full ${health.active_vlm_backend ? "bg-green-500" : "bg-red-500"}`}
-                title={health.active_vlm_backend ?? "no backend reachable"}
+                className={`h-1.5 w-1.5 rounded-full ${health.active_vlm_backend ? "bg-green-500" : "bg-red-500"}`}
               />
-              VLM backend:{" "}
-              <span className="font-medium text-ink-700">{health.active_vlm_backend ?? "unavailable"}</span>
+              <span>Extraction engine:</span>
+              <span className="font-medium text-ink-800">{health.active_vlm_backend ?? "unavailable"}</span>
             </div>
           )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
-        <section className="rounded-xl border border-ink-200 bg-white p-6 shadow-sm">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <Stepper current={currentStep} />
+
+        <section className="rounded-lg border border-ink-200 bg-white p-4 shadow-sm sm:p-6">
+          <h2 className="mb-4 text-sm font-semibold text-ink-900">
+            <span className="mr-1.5 text-ink-400">1.</span>Upload business cards
+          </h2>
           <Dropzone onSubmit={handleSubmit} maxFiles={MAX_FILES_PER_JOB} disabled={uploading} />
-          {uploadError && <p className="mt-3 text-sm text-red-600">{uploadError}</p>}
+          {uploadError && (
+            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+              {uploadError}
+            </p>
+          )}
         </section>
 
         {pollError && (
-          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{pollError}</p>
+          <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+            {pollError}
+          </p>
         )}
 
         {job && (
           <>
-            <ProgressSummary job={job} />
+            <section aria-label="Extraction progress">
+              <h2 className="mb-2 text-sm font-semibold text-ink-900">
+                <span className="mr-1.5 text-ink-400">2.</span>Extracting
+              </h2>
+              <ProgressSummary job={job} />
+            </section>
 
             <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-ink-800">Extracted Leads</h2>
-                <div className="flex gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-ink-900">
+                  <span className="mr-1.5 text-ink-400">3.</span>Review &amp; export
+                </h2>
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={handleClearBatch}
-                    className="rounded-lg border border-ink-300 px-4 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100"
+                    className="rounded-md border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 sm:px-4"
                   >
                     Clear batch
                   </button>
                   <a
                     href={doneLeadCount > 0 ? exportJobUrl(job.id) : undefined}
                     aria-disabled={doneLeadCount === 0}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm ${
-                      doneLeadCount > 0 ? "bg-green-600 hover:bg-green-700" : "cursor-not-allowed bg-ink-300"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold text-white shadow-sm sm:px-4 ${
+                      doneLeadCount > 0 ? "bg-brand-600 hover:bg-brand-700" : "pointer-events-none bg-ink-300"
                     }`}
                   >
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+                      <path d="M10 3v10m0 0l-3.5-3.5M10 13l3.5-3.5M4 16.5h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                     Download Excel ({doneLeadCount})
                   </a>
                 </div>
@@ -123,9 +155,9 @@ export default function App() {
         )}
       </main>
 
-      <footer className="mx-auto max-w-6xl px-6 py-8 text-xs text-ink-400">
+      <footer className="mx-auto max-w-5xl px-4 py-8 text-xs text-ink-400 sm:px-6">
         Uploaded card images and extracted data are automatically deleted a short time after
-        processing. Click any cell in the table to correct it before exporting.
+        processing. Click any field to correct it before exporting.
       </footer>
     </div>
   );
