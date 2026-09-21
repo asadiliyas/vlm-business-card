@@ -5,12 +5,17 @@ lead list, and download it as Excel — extraction is powered by a
 self-hosted **Qwen2.5-VL** vision-language model on AWS.
 
 **Repository:** [github.com/asadiliyas/vlm-business-card](https://github.com/asadiliyas/vlm-business-card)
-**Live app:** _add the deployed URL here once Phase 2–5 of
-[docs/DEPLOY.md](docs/DEPLOY.md) are complete_
+**Live app:** [https://vlm-cards.35-169-199-247.sslip.io](https://vlm-cards.35-169-199-247.sslip.io)
 **Architecture & technical decisions:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 **Libraries, frameworks & models used:** [docs/COMPONENTS.md](docs/COMPONENTS.md)
 **Cost estimate:** [docs/COSTS.md](docs/COSTS.md)
 **Deployment walkthrough:** [docs/DEPLOY.md](docs/DEPLOY.md)
+
+**Measured accuracy:** 100% (25/25 fields) on the bundled sample set,
+verified end-to-end through the live deployment — see
+[Measuring extraction accuracy](#measuring-extraction-accuracy) below for
+how to reproduce this and why a larger, real-card set is the next step
+before trusting this number broadly.
 
 ---
 
