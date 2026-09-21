@@ -14,9 +14,9 @@ export AWS_DEFAULT_REGION="$AWS_REGION"
 
 echo "==> Tearing down in region $AWS_REGION"
 
-echo "--> Terminating tagged instances (Name=vlm-app, Name=vlm-gpu-inference)..."
+echo "--> Terminating tagged instances (Name=vlm-app, vlm-gpu-inference, vlm-cpu-inference)..."
 INSTANCE_IDS=$(aws ec2 describe-instances \
-    --filters "Name=tag:Name,Values=vlm-app,vlm-gpu-inference" \
+    --filters "Name=tag:Name,Values=vlm-app,vlm-gpu-inference,vlm-cpu-inference" \
               "Name=instance-state-name,Values=pending,running,stopping,stopped" \
     --query 'Reservations[].Instances[].InstanceId' --output text)
 if [ -n "$INSTANCE_IDS" ]; then

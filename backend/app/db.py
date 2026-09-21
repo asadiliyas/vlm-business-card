@@ -117,6 +117,48 @@ class Database:
         )
         await self.conn.commit()
 
+    async def recover_orphaned_processing_jobs(self) -> int:
+        """
+        Called once at startup. A lead's or job's "queued"/"processing"
+        status only means anything while the asyncio task that set it is
+        still alive in that same process — if the process restarts (a
+        deploy, a crash, `docker compose up` picking up a new image), any
+        row left in one of those states has no task behind it any more and
+        would otherwise sit "processing" forever, since nothing else ever
+        revisits it. This sweeps every such row to "failed" with an honest
+        explanation, and closes out any job left non-terminal as a result.
+
+        Returns the number of leads recovered.
+        """
+        now = _now()
+        cur = await self.conn.execute(
+            "SELECT id, job_id FROM leads WHERE status IN ('queued', 'processing')"
+        )
+        orphaned = await cur.fetchall()
+        if not orphaned:
+            return 0
+
+        await self.conn.execute(
+            "UPDATE leads SET status = ?, error = ?, updated_at = ? "
+            "WHERE status IN ('queued', 'processing')",
+            (LeadStatus.FAILED, "Interrupted by a server restart — please re-upload this card.", now),
+        )
+
+        affected_job_ids = {row["job_id"] for row in orphaned}
+        for job_id in affected_job_ids:
+            cur = await self.conn.execute(
+                "SELECT COUNT(*) as n FROM leads WHERE job_id = ? AND status = 'failed'",
+                (job_id,),
+            )
+            failed_count = (await cur.fetchone())["n"]
+            await self.conn.execute(
+                "UPDATE jobs SET status = ?, failed_files = ?, updated_at = ? WHERE id = ?",
+                (JobStatus.DONE, failed_count, now, job_id),
+            )
+
+        await self.conn.commit()
+        return len(orphaned)
+
     async def get_job(self, job_id: str) -> Job | None:
         cur = await self.conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
         row = await cur.fetchone()

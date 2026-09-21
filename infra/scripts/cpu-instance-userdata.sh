@@ -24,9 +24,9 @@ docker run -d \
     --shm-size 4g \
     -p 8000:8000 \
     -v /opt/llama-models:/models \
-    -e LLAMA_ARG_HF_REPO="Qwen/Qwen2.5-VL-3B-Instruct-GGUF" \
-    -e LLAMA_ARG_HF_FILE="qwen2.5-vl-3b-instruct-q4_k_m.gguf" \
-    -e LLAMA_ARG_MMPROJ_URL="https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-qwen2.5-vl-3b-instruct-f16.gguf" \
+    -e LLAMA_ARG_HF_REPO="ggml-org/Qwen2.5-VL-3B-Instruct-GGUF" \
+    -e LLAMA_ARG_HF_FILE="Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf" \
+    -e LLAMA_ARG_MMPROJ_URL="https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf" \
     -e LLAMA_ARG_CTX_SIZE="4096" \
     -e LLAMA_ARG_THREADS="2" \
     -e LLAMA_ARG_HOST="0.0.0.0" \
@@ -36,6 +36,6 @@ docker run -d \
 # Same no-public-exposure rule as the GPU instance: restrict inbound :8000
 # to the app tier's security group only.
 #
-# On the app instance, point VLM_PRIMARY_MODEL at
-# "qwen2.5-vl-3b-instruct-q4_k_m.gguf" (or whatever llama.cpp reports at
-# GET /v1/models) instead of the AWQ model name used for the GPU path.
+# On the app instance, point VLM_PRIMARY_MODEL at whatever this server
+# actually reports — check with `curl http://<this-instance>:8000/v1/models`
+# — instead of the AWQ model name used for the GPU path.

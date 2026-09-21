@@ -31,6 +31,15 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 async def lifespan(app: FastAPI):
     settings = get_settings()
     db = await init_db(settings)
+
+    recovered = await db.recover_orphaned_processing_jobs()
+    if recovered:
+        logger.warning(
+            "Recovered %d lead(s) left in queued/processing state by a previous run "
+            "(e.g. a restart mid-job) — marked failed so their jobs aren't stuck forever.",
+            recovered,
+        )
+
     sweeper_task = asyncio.create_task(retention_sweeper_loop(db))
     logger.info("Started with primary VLM backend=%s model=%s", settings.vlm_primary_base_url, settings.vlm_primary_model)
     yield

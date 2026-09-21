@@ -16,7 +16,7 @@ from app.config import Settings
 from app.db import Database
 from app.export import build_leads_workbook
 from app.jobs import UploadFile, create_job_with_files
-from app.models import LeadStatus
+from app.models import ExtractedLead, JobStatus, LeadStatus
 from app.vlm.client import BackendConfig, VLMClient
 
 
@@ -162,3 +162,54 @@ async def test_job_deletion_cascades_to_leads(db, settings):
 
     assert await db.get_job(job_id) is None
     assert await db.get_lead(lead_id) is None
+
+
+@pytest.mark.asyncio
+async def test_recover_orphaned_processing_jobs(db, settings):
+    """Regression test for a real incident: restarting the app process (a
+    redeploy, a crash) mid-job kills the in-memory asyncio task but leaves
+    the DB row at 'processing' forever, since nothing else ever revisits
+    it. The startup recovery sweep must close these out rather than let a
+    job sit "processing" indefinitely with no task actually working on it."""
+    created_job = await db.create_job("orphan-job", total_files=3, retention_minutes=60)
+    await db.create_lead_placeholder("lead-queued", created_job.id, "a.jpg")
+    await db.create_lead_placeholder("lead-processing", created_job.id, "b.jpg")
+    await db.mark_lead_processing("lead-processing")
+    await db.create_lead_placeholder("lead-done", created_job.id, "c.jpg")
+    await db.save_lead_result(
+        "lead-done", ExtractedLead(first_name="Jane", confidence=0.9),
+        image_path=None, thumbnail_path=None, vlm_backend_used="primary",
+    )
+    await db.increment_job_progress(created_job.id, failed=False)
+    await db.set_job_status(created_job.id, JobStatus.PROCESSING)
+
+    recovered_count = await db.recover_orphaned_processing_jobs()
+    assert recovered_count == 2  # the queued and processing leads, not the done one
+
+    job = await db.get_job(created_job.id)
+    assert job.status == JobStatus.DONE
+    assert job.completed_files == 1  # untouched — that lead genuinely finished
+    assert job.failed_files == 2
+
+    statuses = {l.id: l.status for l in job.leads}
+    assert statuses["lead-queued"] == LeadStatus.FAILED
+    assert statuses["lead-processing"] == LeadStatus.FAILED
+    assert statuses["lead-done"] == LeadStatus.DONE
+
+    recovered_lead = await db.get_lead("lead-queued")
+    assert "restart" in recovered_lead.error.lower()
+
+
+@pytest.mark.asyncio
+async def test_recover_orphaned_processing_jobs_is_noop_when_nothing_stuck(db, settings):
+    created_job = await db.create_job("clean-job", total_files=1, retention_minutes=60)
+    await db.create_lead_placeholder("lead-1", created_job.id, "a.jpg")
+    await db.save_lead_result(
+        "lead-1", ExtractedLead(first_name="Jane", confidence=0.9),
+        image_path=None, thumbnail_path=None, vlm_backend_used="primary",
+    )
+    await db.set_job_status(created_job.id, JobStatus.DONE)
+
+    assert await db.recover_orphaned_processing_jobs() == 0
+    job = await db.get_job(created_job.id)
+    assert job.status == JobStatus.DONE  # untouched

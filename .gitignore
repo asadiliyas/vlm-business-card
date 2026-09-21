@@ -32,6 +32,9 @@ backend/uploads/
 backend/thumbnails/
 data/
 
+# Generated at provisioning time
+.app-userdata.generated.sh
+
 # OS / editor
 .DS_Store
 Thumbs.db

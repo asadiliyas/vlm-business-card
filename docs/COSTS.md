@@ -54,8 +54,16 @@ of these in order.
 | Path | Monthly cost | Satisfies "deploy a Qwen VLM on AWS"? |
 |---|---|---|
 | **B — GPU spot (this project's primary path)** | ~$25, covered by credits | Yes, fully |
-| **A — CPU contingency (`t3.large` + llama.cpp)** | ~$10–15 | Yes, fully — slower per card |
+| **A — CPU contingency (llama.cpp on a free-tier-eligible instance)** | **$0** — this account's Free Plan includes `m7i-flex.large` (2 vCPU/8 GB), which is what's actually deployed right now | Yes, fully — slower per card |
 | **C — hosted Qwen API only, no self-hosted instance** | $0, hard guarantee | No — this calls a Qwen API rather than deploying one |
+
+Path A turned out to be genuinely free on this account (see
+`docs/ARCHITECTURE.md` §1) rather than merely cheap — the original estimate
+below assumed a non-free-tier `t3.large`, which this account's Free Plan
+actually refuses to launch at all. Path B (GPU) remains the primary once
+the GPU quota request clears, since it's meaningfully faster; Path A is
+what's live in the meantime, at zero cost rather than the ~$10–15/month
+originally estimated.
 
 Path B was chosen as primary specifically because it's the only option that
 fully satisfies requirement #1 while still landing at $0 under typical

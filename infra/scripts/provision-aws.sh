@@ -21,6 +21,14 @@
 
 set -euo pipefail
 
+# On Git Bash for Windows, MSYS auto-translates any argument that looks like
+# an absolute POSIX path (leading /) into a Windows path before it reaches
+# aws.exe — including things that merely start with / but aren't filesystem
+# paths at all, like SSM parameter names (/aws/service/...). This disables
+# that translation. It's a no-op (and harmless) on real Linux bash, where
+# nothing reads this variable.
+export MSYS2_ARG_CONV_EXCL='*'
+
 # ============================== CONFIG ==================================
 AWS_REGION="us-east-1"                      # pick a region with good g4dn spot capacity
 KEY_NAME="vlm-card-key"
@@ -50,27 +58,37 @@ VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true \
     --query 'Vpcs[0].VpcId' --output text)
 echo "==> Using default VPC: $VPC_ID"
 
-# --- 3. Security groups ---------------------------------------------------
-APP_SG_ID=$(aws ec2 create-security-group \
-    --group-name vlm-app-sg \
-    --description "App tier: HTTP/HTTPS public, SSH from admin IP only" \
-    --vpc-id "$VPC_ID" --query 'GroupId' --output text)
+# --- 3. Security groups (idempotent: reuse if this script already ran) ----
+find_or_create_sg() {
+    local name="$1" desc="$2"
+    local existing
+    existing=$(aws ec2 describe-security-groups \
+        --filters "Name=group-name,Values=$name" "Name=vpc-id,Values=$VPC_ID" \
+        --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null)
+    if [ -n "$existing" ] && [ "$existing" != "None" ]; then
+        echo "$existing"
+    else
+        aws ec2 create-security-group --group-name "$name" --description "$desc" \
+            --vpc-id "$VPC_ID" --query 'GroupId' --output text
+    fi
+}
+
+# authorize-security-group-ingress errors if the exact rule already exists;
+# that's fine on a rerun, so failures here are swallowed rather than fatal.
+APP_SG_ID=$(find_or_create_sg vlm-app-sg "App tier: HTTP/HTTPS public, SSH from admin IP only")
 aws ec2 authorize-security-group-ingress --group-id "$APP_SG_ID" \
-    --protocol tcp --port 22 --cidr "$MY_IP_CIDR"
+    --protocol tcp --port 22 --cidr "$MY_IP_CIDR" 2>/dev/null || true
 aws ec2 authorize-security-group-ingress --group-id "$APP_SG_ID" \
-    --protocol tcp --port 80 --cidr 0.0.0.0/0
+    --protocol tcp --port 80 --cidr 0.0.0.0/0 2>/dev/null || true
 aws ec2 authorize-security-group-ingress --group-id "$APP_SG_ID" \
-    --protocol tcp --port 443 --cidr 0.0.0.0/0
+    --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
 echo "==> App security group: $APP_SG_ID"
 
-INFERENCE_SG_ID=$(aws ec2 create-security-group \
-    --group-name vlm-inference-sg \
-    --description "Inference tier: port 8000 from app tier only, SSH from admin IP" \
-    --vpc-id "$VPC_ID" --query 'GroupId' --output text)
+INFERENCE_SG_ID=$(find_or_create_sg vlm-inference-sg "Inference tier: port 8000 from app tier only, SSH from admin IP")
 aws ec2 authorize-security-group-ingress --group-id "$INFERENCE_SG_ID" \
-    --protocol tcp --port 8000 --source-group "$APP_SG_ID"
+    --protocol tcp --port 8000 --source-group "$APP_SG_ID" 2>/dev/null || true
 aws ec2 authorize-security-group-ingress --group-id "$INFERENCE_SG_ID" \
-    --protocol tcp --port 22 --cidr "$MY_IP_CIDR"
+    --protocol tcp --port 22 --cidr "$MY_IP_CIDR" 2>/dev/null || true
 echo "==> Inference security group: $INFERENCE_SG_ID (locked to app SG + your IP)"
 
 # --- 4. App instance (t3.micro, free tier, on-demand) ---------------------
@@ -78,14 +96,19 @@ AL2023_AMI=$(aws ssm get-parameters \
     --names /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
     --query 'Parameters[0].Value' --output text)
 
-sed "s#__REPO_URL__#${REPO_URL}#" infra/scripts/app-instance-userdata.sh > /tmp/app-userdata.sh
+# Written relative to the current directory rather than an absolute /tmp
+# path — on Windows/Git Bash, an absolute /tmp path inside a file:// URI
+# does not get translated before reaching the native (non-MSYS) aws.exe,
+# which then fails to find it. A relative path avoids that entirely and
+# works the same on Linux.
+sed "s#__REPO_URL__#${REPO_URL}#" infra/scripts/app-instance-userdata.sh > ./.app-userdata.generated.sh
 
 APP_INSTANCE_ID=$(aws ec2 run-instances \
     --image-id "$AL2023_AMI" \
     --instance-type "$APP_INSTANCE_TYPE" \
     --key-name "$KEY_NAME" \
     --security-group-ids "$APP_SG_ID" \
-    --user-data file:///tmp/app-userdata.sh \
+    --user-data file://./.app-userdata.generated.sh \
     --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=vlm-app}]' \
     --query 'Instances[0].InstanceId' --output text)

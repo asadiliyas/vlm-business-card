@@ -138,12 +138,28 @@ Ready when `docker exec qwen-vlm curl -s localhost:8000/v1/models` returns
 the model.
 
 **CPU contingency path** (if the GPU quota wasn't approved in time): launch
-a `t3.large` instead, using `infra/scripts/cpu-instance-userdata.sh` as its
-user-data (same security group as the GPU instance would have used). It
-needs no quota increase. Point `VLM_PRIMARY_BASE_URL` on the app instance at
-this instance's private IP instead, and set
-`VLM_PRIMARY_MODEL=qwen2.5-vl-3b-instruct-q4_k_m.gguf`. Expect 30–90s per
-card rather than 2–5s.
+a `t3.large` (or see the note below) instead, using
+`infra/scripts/cpu-instance-userdata.sh` as its user-data (same security
+group as the GPU instance would have used). It needs no quota increase.
+Point `VLM_PRIMARY_BASE_URL` on the app instance at this instance's private
+IP instead, and set `VLM_PRIMARY_MODEL` to whatever
+`curl http://<instance>:8000/v1/models` actually reports once the server is
+up (it reflects the exact GGUF filename served). Expect 30–90s per card
+rather than 2–5s.
+
+**Note on instance type / "Free Plan" accounts:** newer AWS accounts on the
+credit-based "AWS Free Plan" (see `docs/COSTS.md`) reject non-free-tier
+instance types outright (`InvalidParameterCombination`), regardless of
+vCPU quota. Check what's actually free-tier-eligible on the account before
+assuming `t3.large`:
+```bash
+aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true \
+    --query 'InstanceTypes[].InstanceType' --output table
+```
+At the time this was deployed, that list included **`m7i-flex.large`**
+(2 vCPU, 8 GB RAM) — comfortably enough for Qwen2.5-VL-3B at Q4, and
+genuinely free rather than merely cheap. Use whatever the account's actual
+list shows.
 
 ---
 

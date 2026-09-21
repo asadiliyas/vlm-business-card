@@ -13,11 +13,11 @@ THRESHOLD_USD="${2:-5}"
 # actually deploy resources into.
 export AWS_DEFAULT_REGION="us-east-1"
 
-echo "==> Enabling billing alerts (required once per account for the CloudWatch alarm below)..."
-aws ce update-anomaly-monitor 2>/dev/null || true  # best-effort; some accounts already have this
-echo "!! If this is a brand-new account, also enable 'Receive Billing Alerts' manually:"
+echo "!! The CloudWatch alarm below needs 'Receive Billing Alerts' enabled once per account:"
 echo "!! Billing Console > Billing preferences > check 'Receive Billing Alerts' > Save."
-echo "!! (There's no CLI call for this specific checkbox — it's a one-time console step.)"
+echo "!! There's no CLI call for that specific checkbox. The AWS Budget created further down"
+echo "!! does NOT depend on it and works regardless — treat the Budget as primary and the"
+echo "!! CloudWatch alarm as a secondary layer that needs that one manual step to activate."
 
 TOPIC_ARN=$(aws sns create-topic --name vlm-billing-alerts --query 'TopicArn' --output text)
 aws sns subscribe --topic-arn "$TOPIC_ARN" --protocol email --notification-endpoint "$ALERT_EMAIL" > /dev/null
@@ -38,8 +38,12 @@ aws cloudwatch put-metric-alarm \
 echo "==> CloudWatch billing alarm created at \$${THRESHOLD_USD}."
 
 # A Budget as a second, independent tripwire — it can also forecast and
-# warn you *before* you cross the threshold, not just after.
-cat > /tmp/budget.json <<EOF
+# warn you *before* you cross the threshold, not just after. JSON is passed
+# inline (not via a file:// paramfile) — on Windows/Git Bash, an absolute
+# /tmp path inside a file:// URI does not get translated to a real Windows
+# path before reaching the (native, non-MSYS) aws.exe, which then fails to
+# find it. Inline JSON sidesteps that entirely and works the same on Linux.
+BUDGET_JSON=$(cat <<EOF
 {
   "BudgetName": "vlm-business-card-monthly",
   "BudgetLimit": {"Amount": "$THRESHOLD_USD", "Unit": "USD"},
@@ -47,8 +51,27 @@ cat > /tmp/budget.json <<EOF
   "BudgetType": "COST"
 }
 EOF
-cat > /tmp/budget-notifications.json <<EOF
+)
+NOTIFICATIONS_JSON=$(cat <<EOF
 [
+  {
+    "Notification": {
+      "NotificationType": "FORECASTED",
+      "ComparisonOperator": "GREATER_THAN",
+      "Threshold": 80,
+      "ThresholdType": "PERCENTAGE"
+    },
+    "Subscribers": [{"SubscriptionType": "EMAIL", "Address": "$ALERT_EMAIL"}]
+  },
+  {
+    "Notification": {
+      "NotificationType": "ACTUAL",
+      "ComparisonOperator": "GREATER_THAN",
+      "Threshold": 50,
+      "ThresholdType": "PERCENTAGE"
+    },
+    "Subscribers": [{"SubscriptionType": "EMAIL", "Address": "$ALERT_EMAIL"}]
+  },
   {
     "Notification": {
       "NotificationType": "ACTUAL",
@@ -60,12 +83,13 @@ cat > /tmp/budget-notifications.json <<EOF
   }
 ]
 EOF
+)
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 aws budgets create-budget \
     --account-id "$ACCOUNT_ID" \
-    --budget file:///tmp/budget.json \
-    --notifications-with-subscribers file:///tmp/budget-notifications.json \
+    --budget "$BUDGET_JSON" \
+    --notifications-with-subscribers "$NOTIFICATIONS_JSON" \
     2>&1 || echo "!! Budget may already exist — check the Budgets console."
 
 echo "==> Done. You will get an email at $ALERT_EMAIL if charges exceed \$${THRESHOLD_USD}."

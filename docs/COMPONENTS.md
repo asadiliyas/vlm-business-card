@@ -8,7 +8,7 @@ it would take to swap it out.
 | Component | What it is | Why chosen |
 |---|---|---|
 | **Qwen2.5-VL-7B-Instruct-AWQ** | Alibaba's open-weight vision-language model, 4-bit AWQ-quantized, served on the GPU (primary) path | Required by the assignment. AWQ quantization roughly halves VRAM/RAM needs with minimal accuracy loss, fitting a single T4 GPU (16 GB). Strong OCR + layout understanding, including non-Latin scripts. Apache 2.0 licensed. |
-| **Qwen2.5-VL-3B-Instruct (GGUF, Q4_K_M)** | Smaller Qwen2.5-VL checkpoint, 4-bit GGUF quantization, served on the CPU contingency path | Used when the GPU path is unavailable (see `docs/ARCHITECTURE.md` §3). Small enough to run inference on CPU in tens of seconds per card. |
+| **Qwen2.5-VL-3B-Instruct (GGUF, Q4_K_M)** — [`ggml-org/Qwen2.5-VL-3B-Instruct-GGUF`](https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF) | Smaller Qwen2.5-VL checkpoint, 4-bit GGUF quantization, served on the CPU contingency path (currently the live deployment) | Used when the GPU path is unavailable (see `docs/ARCHITECTURE.md` §3). Small enough to run inference on CPU in tens of seconds per card. Sourced from the `ggml-org` conversion specifically because the official `Qwen/…-GGUF` repo returned HTTP 401 (gated) at deploy time — `ggml-org`, maintained by the llama.cpp team itself, is ungated and built for exactly this runtime. |
 | **Qwen VL (hosted)** — `qwen-vl-max` via DashScope, or via OpenRouter | Alibaba Cloud's hosted inference endpoint for the same model family | Automatic fallback backend — see `docs/ARCHITECTURE.md` §2. Keeps the public demo available even if the self-hosted instance is down. |
 
 ## Inference serving

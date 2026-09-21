@@ -26,12 +26,24 @@ instances**, sized for what they each actually do:
 | Tier | Instance | Why |
 |---|---|---|
 | App (this repo: FastAPI + React) | `t3.micro`, **free-tier eligible** | Serves static assets and thin JSON endpoints — genuinely fits in 1 GB |
-| Inference (Qwen2.5-VL) | `g4dn.xlarge` (GPU, primary) or `t3.large` (CPU, contingency) | Actually holds and runs model weights |
+| Inference (Qwen2.5-VL) | `g4dn.xlarge` (GPU, primary, pending quota) or a free-tier-eligible CPU instance (contingency, currently live) | Actually holds and runs model weights |
 
-The GPU instance is not free-tier, but it **is a real, self-hosted Qwen
+The GPU path is not free-tier, but it **is a real, self-hosted Qwen
 deployment on AWS**, run on a spot instance to keep cost minimal (see
 `docs/COSTS.md`). This satisfies requirement #1 truthfully instead of
 technically.
+
+**A deployment-time discovery worth recording:** this account was created
+under AWS's newer credit-based "Free Plan" (see `docs/COSTS.md`), which
+turned out to have a broader free-tier-eligible instance list than the
+classic `t2/t3.micro`-only free tier — including `m7i-flex.large`
+(2 vCPU, **8 GB RAM**). That's enough to run Qwen2.5-VL-3B-Instruct at Q4
+quantization comfortably, which means the CPU contingency path described
+below is, on this account, not just cheap but **genuinely free** —
+narrowing the "Qwen VLM" vs. "free-tier AWS" tension further than the
+original plan assumed. (This is account/promotion-dependent, not a
+platform guarantee — see the note in `docs/DEPLOY.md` on checking a given
+account's actual free-tier-eligible list before assuming an instance type.)
 
 ## 2. Primary/fallback VLM backend chain
 
@@ -76,7 +88,7 @@ block the whole project on that approval:
 | Path | Model / server | Needs GPU quota? | Latency/card |
 |---|---|---|---|
 | **Primary** | Qwen2.5-VL-7B-Instruct-AWQ on vLLM, `g4dn.xlarge` spot | Yes | 2–5s |
-| **Contingency** | Qwen2.5-VL-3B-Instruct (Q4_K_M GGUF) on llama.cpp, `t3.large` | No | 30–90s |
+| **Contingency** (currently live) | Qwen2.5-VL-3B-Instruct (Q4_K_M GGUF, `ggml-org` build) on llama.cpp, `m7i-flex.large` — free-tier eligible on this account | No | 30–90s |
 | **Fallback** | Hosted Qwen (DashScope `qwen-vl-max` or OpenRouter) | No | 3–8s |
 
 All three are wired up and swappable purely through environment variables
