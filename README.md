@@ -4,6 +4,7 @@ Upload a batch of business card photos, get back a structured, editable
 lead list, and download it as Excel — extraction is powered by a
 self-hosted **Qwen2.5-VL** vision-language model on AWS.
 
+**Repository:** [github.com/asadiliyas/vlm-business-card](https://github.com/asadiliyas/vlm-business-card)
 **Live app:** _add the deployed URL here once Phase 2–5 of
 [docs/DEPLOY.md](docs/DEPLOY.md) are complete_
 **Architecture & technical decisions:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)

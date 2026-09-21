@@ -52,12 +52,17 @@ skip to "Alternative: CPU contingency path" below instead of waiting.
 
 ## Phase 1 — Push the code to GitHub
 
+Already done for this submission: the repo is public at
+[github.com/asadiliyas/vlm-business-card](https://github.com/asadiliyas/vlm-business-card),
+and `infra/scripts/provision-aws.sh` already points `REPO_URL` at it.
+
+If you've forked this or are working from a copy, point it at your own
+remote instead:
 ```bash
 git remote add origin https://github.com/<you>/vlm-business-card.git
 git push -u origin main
 ```
-
-Update `REPO_URL` in `infra/scripts/provision-aws.sh` to match before
+and update `REPO_URL` in `infra/scripts/provision-aws.sh` to match before
 provisioning — the app instance clones from that URL on first boot.
 
 ---

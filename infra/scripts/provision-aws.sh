@@ -26,7 +26,7 @@ AWS_REGION="us-east-1"                      # pick a region with good g4dn spot 
 KEY_NAME="vlm-card-key"
 APP_INSTANCE_TYPE="t3.micro"                # free-tier eligible
 GPU_INSTANCE_TYPE="g4dn.xlarge"
-REPO_URL="https://github.com/CHANGE-ME/vlm-business-card.git"  # your pushed repo
+REPO_URL="https://github.com/asadiliyas/vlm-business-card.git"
 MY_IP_CIDR="$(curl -s https://checkip.amazonaws.com)/32"       # SSH access restricted to you
 # ==========================================================================
 
