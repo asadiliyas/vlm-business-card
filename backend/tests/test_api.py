@@ -78,7 +78,24 @@ def test_upload_rejects_too_many_files(client):
     assert "max is 3" in resp.json()["detail"]
 
 
-def test_upload_accepts_valid_batch_and_returns_job_summary(client):
+def test_upload_accepts_valid_batch_and_returns_job_summary(client, monkeypatch):
+    # The route schedules real background processing via asyncio.create_task
+    # (by design — the HTTP response must return before extraction finishes).
+    # That task is only reachable here through the real VLMClient, so this
+    # patches its network call to resolve instantly rather than actually
+    # dialing the deliberately-unreachable test host. Without this, a real
+    # regression showed up on Linux CI runners (though not on Windows): the
+    # bare TestClient(app) used here has no persistent event loop across
+    # calls, and tearing that loop down while a slow/hung connection attempt
+    # is still in flight on the background task made the *test itself* hang
+    # for hours rather than failing fast — see git history for the incident.
+    async def instant_extract(self, image_bytes, *, mime_type="image/jpeg"):
+        from app.vlm.client import BackendName, ExtractionResult
+        from app.models import ExtractedLead
+        return ExtractionResult(lead=ExtractedLead(confidence=0.0), backend_used=BackendName.PRIMARY, attempts=1)
+
+    monkeypatch.setattr("app.vlm.client.VLMClient.extract", instant_extract)
+
     files = [("files", _jpeg_file("card1.jpg")), ("files", _jpeg_file("card2.jpg"))]
     resp = client.post("/api/jobs", files=files)
     assert resp.status_code == 201
