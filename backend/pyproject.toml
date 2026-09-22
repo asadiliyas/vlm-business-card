@@ -2,3 +2,9 @@
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# No test in this suite has a legitimate reason to take more than a few
+# seconds — everything that talks to a "backend" talks to a fake one. This
+# is a safety net: a hung test now fails in 30s with a traceback pointing
+# at exactly where it's stuck, instead of exhausting CI's 6-hour job
+# timeout in silence (which happened — see git history).
+timeout = 30
